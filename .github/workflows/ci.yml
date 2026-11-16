@@ -58,6 +58,35 @@ jobs:
         if: steps.secrets.outputs.present == 'true'
         run: bash tests/run.sh
 
+  # Optional: not a required check.
+  peachq:
+    name: tests (optional)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install peachq
+        id: pq
+        uses: peachq-org/setup-peachq@v1.0.0
+        with:
+          version: 0.92.20261116
+
+      - name: Run test suite (peachq)
+        shell: bash
+        run: |
+          skip=$(printf '`%s' \
+            compress_splay_ignoreColumns_copiesIgnoredCompressesRest \
+            compress_splay_compressColumns_onlyListedCompressed \
+            compress_splay_compressColumnsAndIgnoreColumnsBothSetRaises \
+            compress_partition_ignoreTables_excludesTable \
+            convert_stringToHsym_emptyString)
+          sed -i "s/^\.test\.runAllAndExit/.t:($skip) _ .t;\n&/" tests/run.q
+          $QCMD boot.q -classic < tests/run.q | tee out.txt || rc=$?
+          echo "**peachq ${{ steps.pq.outputs.version }}:** $(sed -n 's/^Result: //p' out.txt)" >> "$GITHUB_STEP_SUMMARY"
+          exit ${rc:-0}
+
 # NOTE: Code-coverage collection (ROADMAP 2.3) is a planned follow-up — there is no
 # mature line-coverage tool for q. A q-linter (qlint) step can be added to the
 # 'lint' job once a pinned qlint distribution is chosen.
